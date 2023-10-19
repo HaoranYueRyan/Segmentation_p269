@@ -14,7 +14,6 @@ from skimage.segmentation import clear_border
 from skimage.filters import sobel
 from stardist.models import StarDist2D
 from csbdeep.utils import normalize
-model = StarDist2D.from_pretrained('2D_versatile_fluo')
 from scipy import ndimage as ndi
 
 def scale_img(img: np.array, percentile: tuple[float, float] = (2, 98)) -> np.array:
@@ -22,10 +21,12 @@ def scale_img(img: np.array, percentile: tuple[float, float] = (2, 98)) -> np.ar
     percentiles = np.percentile(img, (percentile[0], percentile[1]))
     return exposure.rescale_intensity(img, in_range=tuple(percentiles))
 
-def normlize_img(img: np.array) -> np.array:
-    """normalize the image to the [0,1]"""
-    norm_img=(img-img.min())/(img.max()-img.min())
-    return norm_img
+def normlize_img(image: np.array) -> np.array:
+    mean = np.mean(image)
+    std_dev = np.std(image)
+    normalized_image = (image - mean) / std_dev
+    return normalized_image
+
 
 def find_edges(img:np.array)-> np.array:
     """find the edge of each objects"""
@@ -38,10 +39,12 @@ def Stardist_Segmentation(image):
     :param image: Image to Segment
     :return: Segmented Objects and Labels
     """
+    model = StarDist2D.from_pretrained('2D_versatile_fluo',)
     label_objects, nb_labels = model.predict_instances(normalize(image))
-    cleared = remove_small_objects(clear_border(label_objects), 10)
-    segmented_cells, cell_number = ndi.label(cleared)
-    return segmented_cells, cell_number
+    print(nb_labels)
+    # cleared = remove_small_objects(clear_border(label_objects), 1)
+    # segmented_cells, cell_number = ndi.label(cleared)
+    return label_objects, nb_labels
 
 
 def filter_segmentation(mask: np.ndarray) -> np.ndarray:
@@ -80,8 +83,12 @@ def cellpose_segmentation(image):
     # model = models.CellposeModel(gpu=True, model_type=os.path.dirname(os.getcwd())+'/data/CellPose_models/'+Defaults.MODEL_DICT['nuclei'])
     model=models.Cellpose(model_type='nuclei')
     n_channels = [[0, 0]]
-    n_mask_array, n_flows, n_styles, n_diams= model.eval(image, channels=n_channels,diameter=12)
+    n_mask_array, n_flows, n_styles, n_diams= model.eval(image, channels=n_channels,diameter=10,flow_threshold=0.4)
         # return cleaned up mask using filter function
         # return filter_segmentation(n_mask_array)
-
+    segmented_cells, cell_number = ndi.label(n_mask_array)
+    print(cell_number)
     return n_mask_array
+
+# prints a list of available models
+print(StarDist2D.from_pretrained())
